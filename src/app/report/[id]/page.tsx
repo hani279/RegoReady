@@ -1,0 +1,207 @@
+import Link from "next/link";
+import { Suspense } from "react";
+import type { Verdict } from "@/lib/engine/pathway";
+import { dollars } from "@/lib/format";
+import { isDemoData } from "@/lib/ppsr";
+import { fulfilReport, getReport, type Report } from "@/lib/reports";
+import { getStripe } from "@/lib/stripe";
+
+type Props = PageProps<"/report/[id]">;
+
+export default function ReportPage(props: Props) {
+  return (
+    <div className="mx-auto flex max-w-xl flex-col gap-5 px-5 pb-16 pt-4">
+      <Suspense fallback={<p className="text-soft">Loading your report…</p>}>
+        <ReportBody {...props} />
+      </Suspense>
+    </div>
+  );
+}
+
+// Loads the report. If the buyer has just come back from Stripe and the
+// webhook has not landed yet, confirm the payment directly.
+async function load(id: string, sessionId?: string): Promise<Report | null> {
+  const report = await getReport(id);
+  if (!report || report.paid || !sessionId) return report;
+  const stripe = getStripe();
+  if (!stripe) return report;
+  const session = await stripe.checkout.sessions.retrieve(sessionId);
+  if (session.payment_status === "paid" && session.metadata?.reportId === id) {
+    return fulfilReport(id);
+  }
+  return report;
+}
+
+const banner: Record<Verdict, string> = {
+  clear: "bg-clear",
+  caution: "bg-ink",
+  blocked: "bg-blocked",
+};
+
+function Check(props: { label: string; value: string; tone: "ok" | "warn" | "bad" }) {
+  const tone = {
+    ok: "text-clear-text",
+    warn: "text-amber-text",
+    bad: "text-blocked font-bold",
+  }[props.tone];
+  return (
+    <li className="flex min-h-12 items-center justify-between gap-4 border-b border-[#e8eae4] py-2 text-sm last:border-b-0">
+      <span>{props.label}</span>
+      <span className={`text-right font-semibold ${tone}`}>{props.value}</span>
+    </li>
+  );
+}
+
+async function ReportBody({ params, searchParams }: Props) {
+  const { id } = await params;
+  const { session_id } = await searchParams;
+  const report = await load(id, typeof session_id === "string" ? session_id : undefined);
+
+  if (!report) {
+    return (
+      <>
+        <h1 className="font-display text-2xl font-bold">Report not found</h1>
+        <Link href="/#check" className="font-semibold underline">
+          Check a car
+        </Link>
+      </>
+    );
+  }
+  if (!report.paid || !report.record || !report.pathway) {
+    return (
+      <>
+        <h1 className="font-display text-2xl font-bold">
+          Waiting for payment
+        </h1>
+        <p className="text-soft">
+          We have not received payment for {report.identifier} yet. If you have
+          just paid, refresh this page in a few seconds.
+        </p>
+      </>
+    );
+  }
+
+  const { record, pathway } = report;
+  const writtenOff =
+    record.writtenOff === "none"
+      ? "Not recorded"
+      : `${record.writtenOff === "statutory" ? "Statutory" : "Repairable"} write-off, ${record.writtenOffState ?? "state unknown"}`;
+  const rego =
+    record.rego.status === "none"
+      ? "None recorded"
+      : `${record.rego.status[0].toUpperCase()}${record.rego.status.slice(1)}${record.rego.state ? `, ${record.rego.state}` : ""}`;
+
+  return (
+    <>
+      {isDemoData() && (
+        <p className="rounded-xl border border-amber-line bg-amber px-4 py-3 text-sm text-amber-text">
+          Sample data. This is not a real register search.
+        </p>
+      )}
+      <div className="flex flex-col gap-1">
+        <h1 className="font-display text-2xl font-bold">{record.description}</h1>
+        <p className="font-mono text-[13px] text-muted">VIN {record.vin}</p>
+      </div>
+
+      <div className={`flex flex-col gap-1 rounded-2xl p-5 text-white ${banner[pathway.verdict]}`}>
+        <p className="font-display text-xl font-bold">{pathway.headline}</p>
+        <p className="text-sm leading-5">{pathway.summary}</p>
+      </div>
+
+      <ul className="flex flex-col rounded-2xl border border-line bg-card px-4 py-1.5">
+        <Check
+          label="Finance owing"
+          value={record.financeOwing ? "Recorded" : "None recorded"}
+          tone={record.financeOwing ? "bad" : "ok"}
+        />
+        <Check
+          label="Written-off"
+          value={writtenOff}
+          tone={record.writtenOff === "none" ? "ok" : "bad"}
+        />
+        <Check
+          label="Stolen"
+          value={record.stolen ? "Recorded as stolen" : "Not recorded"}
+          tone={record.stolen ? "bad" : "ok"}
+        />
+        <Check
+          label="Registration"
+          value={rego}
+          tone={record.rego.status === "current" ? "ok" : "warn"}
+        />
+      </ul>
+
+      {pathway.reasons.length > 0 && (
+        <section className="flex flex-col gap-3 rounded-2xl border border-line bg-card p-5">
+          <h2 className="font-display text-lg font-bold">Why</h2>
+          {pathway.reasons.map((r) => (
+            <p key={r.text} className="text-sm leading-[21px] text-soft">
+              {r.text}{" "}
+              {r.source && (
+                <a href={r.source} target="_blank" rel="noreferrer" className="font-semibold underline">
+                  Source
+                </a>
+              )}
+            </p>
+          ))}
+        </section>
+      )}
+
+      {pathway.steps.length > 0 && (
+        <section className="flex flex-col gap-2.5">
+          <h2 className="font-display text-lg font-bold">Your path to rego</h2>
+          <ol className="flex flex-col gap-2.5">
+            {pathway.steps.map((s, i) => (
+              <li key={s.title} className="flex gap-3 rounded-2xl border border-line bg-card px-4 py-3.5">
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-ink font-display text-sm font-bold text-white">
+                  {i + 1}
+                </span>
+                <div className="flex grow flex-col gap-0.5">
+                  <div className="flex justify-between gap-3 text-[15px] font-semibold">
+                    <span>{s.title}</span>
+                    {s.cost !== undefined && (
+                      <span className="tabular-nums">{dollars(s.cost)}</span>
+                    )}
+                  </div>
+                  <p className="text-[13px] leading-[19px] text-muted">{s.detail}</p>
+                  {s.source && (
+                    <a href={s.source} target="_blank" rel="noreferrer" className="flex min-h-11 items-center text-[13px] font-semibold underline">
+                      Official source
+                    </a>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
+      <div className="flex flex-col gap-2.5">
+        {record.certificateUrl && (
+          <a
+            href={record.certificateUrl}
+            className="flex min-h-[54px] items-center justify-center rounded-[10px] border-2 border-ink bg-plate font-display font-bold"
+          >
+            Download PPSR certificate
+          </a>
+        )}
+        <Link
+          href="/#calculator"
+          className="flex min-h-[54px] items-center justify-center rounded-[10px] border-2 border-ink bg-card font-display font-bold"
+        >
+          Work out the landed cost
+        </Link>
+      </div>
+
+      <p className="text-xs leading-[18px] text-muted">
+        General information, not legal advice. Register data as returned on{" "}
+        {new Date(record.searchedAt).toLocaleDateString("en-AU", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        })}
+        . Confirm with Service NSW before acting.
+      </p>
+    </>
+  );
+}
