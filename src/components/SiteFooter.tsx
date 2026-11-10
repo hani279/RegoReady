@@ -50,6 +50,8 @@ export default function SiteFooter() {
           ))}
         </Column>
         <Column title="About">
+          <Link href="/how-it-works" className={linkClass}>How it works</Link>
+          <Link href="/faq" className={linkClass}>FAQ</Link>
           <Link href="/sources" className={linkClass}>Sources and fee data</Link>
           <Link href="/terms" className={linkClass}>Terms</Link>
           <Link href="/privacy" className={linkClass}>Privacy</Link>

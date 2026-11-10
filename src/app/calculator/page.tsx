@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CheckCard, PageHeader } from "@/components/Blocks";
+import { PageHeader } from "@/components/Blocks";
 import Calculator from "@/components/Calculator";
 import { container } from "@/lib/ui";
 
@@ -19,11 +19,6 @@ export default function CalculatorPage() {
       />
       <div className={`${container} pb-14`}>
         <Calculator />
-      </div>
-      <div className="border-t border-line bg-card">
-        <div className={`${container} flex justify-center py-14`}>
-          <CheckCard />
-        </div>
       </div>
     </>
   );

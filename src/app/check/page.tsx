@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { CheckCard, Faq, PageHeader, TickList } from "@/components/Blocks";
-import { container, h2 } from "@/lib/ui";
+import { CheckCard, PageHeader, TickList } from "@/components/Blocks";
+import { container } from "@/lib/ui";
 
 export const metadata: Metadata = {
   title: "Check a car: can it be registered in NSW?",
@@ -34,12 +34,6 @@ export default function CheckPage() {
             The VIN is on the auction listing, the registration papers and the
             compliance plate. It has 17 characters.
           </p>
-        </div>
-      </div>
-      <div className="border-t border-line bg-card">
-        <div className={`${container} grid gap-8 py-16 lg:grid-cols-[0.8fr_1.2fr]`}>
-          <h2 className={h2}>Questions buyers ask</h2>
-          <Faq />
         </div>
       </div>
     </>

@@ -5,6 +5,7 @@ export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:30
 export const NAV = [
   { href: "/calculator", label: "Calculator" },
   { href: "/check", label: "Check a car" },
+  { href: "/how-it-works", label: "How it works" },
   { href: "/fees", label: "Auction fees" },
   { href: "/guides", label: "Guides" },
   { href: "/pricing", label: "Pricing" },
