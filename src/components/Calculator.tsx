@@ -61,10 +61,14 @@ function Choice<T extends string>(props: {
   );
 }
 
-export default function Calculator() {
+export default function Calculator({
+  initialSeller = "pickles",
+}: {
+  initialSeller?: SellerId;
+}) {
   const id = useId();
   const [mode, setMode] = useState<Mode>("cost");
-  const [seller, setSeller] = useState<SellerId>("pickles");
+  const [seller, setSeller] = useState<SellerId>(initialSeller);
   const [price, setPrice] = useState("8500");
   const [budget, setBudget] = useState("10000");
   const [gst, setGst] = useState<"incl" | "excl">("incl");
