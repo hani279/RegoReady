@@ -4,6 +4,7 @@ import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { pathway, type Pathway } from "./engine/pathway";
 import { getPpsrProvider, type VehicleRecord } from "./ppsr";
+import { getStripe } from "./stripe";
 
 export interface Report {
   id: string;
@@ -11,6 +12,10 @@ export interface Report {
   identifier: string;
   paid: boolean;
   stripeSessionId?: string;
+  claim?: string; // which caller started the register search
+  lookupRef?: string; // provider reference for the running search
+  failed?: boolean; // the search failed; the buyer is owed a refund
+  refunded?: boolean; // the refund went through automatically
   record?: VehicleRecord;
   pathway?: Pathway;
 }
@@ -76,8 +81,11 @@ export function normaliseIdentifier(raw: string): string {
 }
 
 // A VIN is 17 characters without I, O or Q; an NSW plate is up to 6.
-export function isValidIdentifier(id: string): boolean {
-  return /^[A-HJ-NPR-Z0-9]{17}$/.test(id) || /^[A-Z0-9]{2,6}$/.test(id);
+export function isValidIdentifier(id: string, allowPlates: boolean): boolean {
+  return (
+    /^[A-HJ-NPR-Z0-9]{17}$/.test(id) ||
+    (allowPlates && /^[A-Z0-9]{2,6}$/.test(id))
+  );
 }
 
 export async function createReport(identifier: string): Promise<Report> {
@@ -101,19 +109,79 @@ export async function attachSession(id: string, sessionId: string) {
   await store().put({ ...report, stripeSessionId: sessionId });
 }
 
-// Runs the paid lookup once payment is confirmed. Safe to call twice:
-// the webhook and the report page can both trigger it.
-export async function fulfilReport(id: string): Promise<Report | null> {
-  const report = await getReport(id);
+// Refunds the payment for a report whose search failed. Returns whether
+// the refund went through, so a failure can be followed up by hand.
+async function refund(report: Report): Promise<boolean> {
+  const stripe = getStripe();
+  if (!stripe || !report.stripeSessionId) return false;
+  try {
+    const session = await stripe.checkout.sessions.retrieve(
+      report.stripeSessionId,
+    );
+    if (typeof session.payment_intent !== "string") return false;
+    await stripe.refunds.create({ payment_intent: session.payment_intent });
+    return true;
+  } catch (err) {
+    console.error("Refund failed", report.id, err);
+    return false;
+  }
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Runs the paid register search once payment is confirmed, waiting up to
+// `waitMs` for the result. Safe to call repeatedly: the Stripe webhook and
+// the report page both call it, and later calls resume the same search.
+export async function fulfilReport(
+  id: string,
+  waitMs = 25000,
+): Promise<Report | null> {
+  let report = await getReport(id);
   if (!report) return null;
-  if (report.paid && report.record) return report;
-  const record = await getPpsrProvider().lookup(report.identifier);
-  const done: Report = {
-    ...report,
-    paid: true,
-    record,
-    pathway: pathway(record),
-  };
-  await store().put(done);
-  return done;
+  if (report.record || report.failed) return report;
+  const provider = getPpsrProvider();
+
+  try {
+    if (!report.lookupRef) {
+      // Another caller is already starting this search.
+      if (report.claim) return report;
+      // Claim the search before starting it, so that a webhook and a page
+      // load arriving together do not both pay for a search.
+      const claim = randomUUID();
+      await store().put({ ...report, paid: true, claim });
+      await sleep(200);
+      report = (await getReport(id))!;
+      if (report.claim !== claim) return report;
+      const lookupRef = await provider.start(report.identifier);
+      report = { ...report, lookupRef };
+      await store().put(report);
+    }
+
+    const deadline = Date.now() + waitMs;
+    for (;;) {
+      const record = await provider.result(report.lookupRef!);
+      if (record) {
+        const full = {
+          ...record,
+          identifier: report.identifier,
+          vin: record.vin || report.identifier,
+        };
+        const done: Report = { ...report, record: full, pathway: pathway(full) };
+        await store().put(done);
+        return done;
+      }
+      if (Date.now() + 2000 > deadline) return report;
+      await sleep(2000);
+    }
+  } catch (err) {
+    console.error("Register search failed", id, err);
+    const failed: Report = {
+      ...report,
+      paid: true,
+      failed: true,
+      refunded: await refund(report),
+    };
+    await store().put(failed);
+    return failed;
+  }
 }

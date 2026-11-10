@@ -1,17 +1,20 @@
+import { businessApiProvider } from "./businessapi";
 import { mockProvider } from "./mock";
 import type { PpsrProvider } from "./types";
 
-// Returns the configured PPSR provider. Only the demo provider exists so
-// far: add the real adapter here once the provider's API docs and sandbox
-// key are in hand, and select it with PPSR_PROVIDER.
+// PPSR_PROVIDER selects the register search provider: "mock" (sample
+// data, the default) or "businessapi" (needs BUSINESSAPI_KEY).
+const providerName = () => process.env.PPSR_PROVIDER ?? "mock";
+
 export function getPpsrProvider(): PpsrProvider {
-  const name = process.env.PPSR_PROVIDER ?? "mock";
+  const name = providerName();
   if (name === "mock") return mockProvider;
+  if (name === "businessapi") return businessApiProvider;
   throw new Error(`Unknown PPSR_PROVIDER "${name}"`);
 }
 
 export function isDemoData(): boolean {
-  return (process.env.PPSR_PROVIDER ?? "mock") === "mock";
+  return providerName() === "mock";
 }
 
 export * from "./types";

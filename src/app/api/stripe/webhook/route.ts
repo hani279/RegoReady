@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     const session = event.data.object;
     const reportId = session.metadata?.reportId;
     if (reportId && session.payment_status === "paid") {
-      await fulfilReport(reportId);
+      await fulfilReport(reportId, 8000);
     }
   }
   return Response.json({ received: true });

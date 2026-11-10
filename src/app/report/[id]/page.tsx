@@ -24,13 +24,15 @@ export default function ReportPage(props: Props) {
   );
 }
 
-// Loads the report. If the buyer has just come back from Stripe and the
-// webhook has not landed yet, confirm the payment directly.
+// Loads the report and, once it is paid for, runs or resumes the register
+// search. If the buyer has just come back from Stripe and the webhook has
+// not landed yet, the payment is confirmed directly.
 async function load(id: string, sessionId?: string): Promise<Report | null> {
   const report = await getReport(id);
-  if (!report || report.paid || !sessionId) return report;
+  if (!report || report.record || report.failed) return report;
+  if (report.paid) return fulfilReport(id);
   const stripe = getStripe();
-  if (!stripe) return report;
+  if (!stripe || !sessionId) return report;
   const session = await stripe.checkout.sessions.retrieve(sessionId);
   if (session.payment_status === "paid" && session.metadata?.reportId === id) {
     return fulfilReport(id);
@@ -60,6 +62,37 @@ async function ReportBody({ params, searchParams }: Props) {
       </>
     );
   }
+  if (report.failed) {
+    return (
+      <>
+        <h1 className="font-display text-2xl font-bold">
+          The register search failed
+        </h1>
+        <p className="text-soft">
+          We could not complete the search for {report.identifier}.{" "}
+          {report.refunded
+            ? "Your payment has been refunded."
+            : "You have not been charged for a report. If a payment was taken, contact us and we will refund it."}
+        </p>
+        <Link href="/check" className="font-semibold underline">
+          Try again
+        </Link>
+      </>
+    );
+  }
+  if (report.paid && !report.record) {
+    return (
+      <>
+        <h1 className="font-display text-2xl font-bold">
+          Still searching the register
+        </h1>
+        <p className="text-soft">
+          The search for {report.identifier} is taking longer than usual. Your
+          payment went through. Refresh this page in a minute.
+        </p>
+      </>
+    );
+  }
   if (!report.paid || !report.record || !report.pathway) {
     return (
       <>
@@ -77,6 +110,9 @@ async function ReportBody({ params, searchParams }: Props) {
       record={report.record}
       pathway={report.pathway}
       sample={isDemoData()}
+      certificateHref={
+        report.record.certificateUrl ? `/report/${id}/certificate` : undefined
+      }
     />
   );
 }

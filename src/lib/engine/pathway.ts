@@ -33,7 +33,8 @@ export function regoStatusOf(record: VehicleRecord): RegoStatus {
   if (rego.state && rego.state !== "NSW" && rego.status === "current") {
     return "interstate";
   }
-  if (rego.state === "NSW" && rego.status === "current") return "current";
+  // State unknown: assume NSW, and the pathway says so.
+  if (rego.status === "current") return "current";
   // Expired under 3 months can usually still be renewed, but the buyer
   // cannot rely on that: treat anything not current as unregistered.
   return "unregistered";
@@ -61,13 +62,16 @@ export function pathway(record: VehicleRecord): Pathway {
   }
 
   if (record.writtenOff !== "none") {
-    const state = record.writtenOffState ?? "an unknown state";
-    const interstate = record.writtenOffState !== "NSW";
+    const state = record.writtenOffState;
+    const interstate = state !== undefined && state !== "NSW";
+    const kind = record.writtenOff === "unknown" ? "" : `${record.writtenOff} `;
     reasons.push({
       text:
         record.writtenOff === "statutory"
           ? "Statutory write-offs are not eligible for an Authorisation to Repair, so they cannot be re-registered."
-          : "A repairable write-off can only be re-registered by someone who was its registered operator for more than 28 days before the damage, had hail damage only, or inherited it. A new buyer does not qualify.",
+          : record.writtenOff === "unknown"
+            ? "The register shows a write-off but not which kind. A statutory write-off can never be re-registered, and a repairable one only by someone who was its registered operator before the damage or who inherited it. A new buyer does not qualify either way."
+            : "A repairable write-off can only be re-registered by someone who was its registered operator for more than 28 days before the damage, had hail damage only, or inherited it. A new buyer does not qualify.",
       source: WRITTEN_OFF_SOURCE,
     });
     if (interstate) {
@@ -82,7 +86,7 @@ export function pathway(record: VehicleRecord): Pathway {
     return {
       verdict: "blocked",
       headline: "Do not buy to drive it",
-      summary: `Recorded as a ${record.writtenOff} write-off in ${state}. As a new buyer you cannot register it in NSW.`,
+      summary: `Recorded as a ${kind}write-off${state ? ` in ${state}` : ""}. As a new buyer you cannot register it in NSW.`,
       reasons,
       steps: [],
       regoStatus,
@@ -133,6 +137,12 @@ export function pathway(record: VehicleRecord): Pathway {
     });
   }
 
+  if (regoStatus === "current" && record.rego.state === null) {
+    reasons.push({
+      text: "The register shows current registration but not which state. These steps assume NSW. If it is registered interstate it needs a blue slip and new NSW registration instead.",
+    });
+  }
+
   if (record.financeOwing) {
     return {
       verdict: "caution",
@@ -143,6 +153,7 @@ export function pathway(record: VehicleRecord): Pathway {
         {
           text: "If the debt is not cleared, the lender can repossess the car from you. Ask the seller for a payout letter and pay the lender directly, or ask the auction house to confirm in writing that it guarantees clear title.",
         },
+        ...reasons,
       ],
       steps,
       regoStatus,

@@ -9,7 +9,11 @@ import type { PpsrProvider, VehicleRecord } from "./types";
 //   anything else = clean, NSW rego expired more than 3 months ago
 export const mockProvider: PpsrProvider = {
   name: "mock",
-  async lookup(identifier: string): Promise<VehicleRecord> {
+  acceptsPlates: true,
+  async start(identifier: string) {
+    return identifier;
+  },
+  async result(identifier: string): Promise<VehicleRecord> {
     const id = identifier.trim().toUpperCase();
     const flag = id.slice(-1);
     const record: VehicleRecord = {

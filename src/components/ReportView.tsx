@@ -69,12 +69,13 @@ export default function ReportView(props: {
   pathway: Pathway;
   sample: boolean;
   compact?: boolean; // preview on the landing page: no actions or footnote
+  certificateHref?: string; // our own download route for the PPSR certificate
 }) {
-  const { record, pathway, sample, compact } = props;
+  const { record, pathway, sample, compact, certificateHref } = props;
   const writtenOff =
     record.writtenOff === "none"
       ? "Not recorded"
-      : `${record.writtenOff === "statutory" ? "Statutory" : "Repairable"} write-off, ${record.writtenOffState ?? "state unknown"}`;
+      : `${{ statutory: "Statutory write-off", repairable: "Repairable write-off", unknown: "Written off" }[record.writtenOff]}${record.writtenOffState ? `, ${record.writtenOffState}` : ""}`;
   const rego =
     record.rego.status === "none"
       ? "None recorded"
@@ -195,9 +196,9 @@ export default function ReportView(props: {
       {!compact && (
         <>
           <div className="flex flex-col gap-2.5">
-            {record.certificateUrl && (
+            {certificateHref && (
               <a
-                href={record.certificateUrl}
+                href={certificateHref}
                 className="flex min-h-[54px] items-center justify-center rounded-[10px] border-2 border-ink bg-plate font-display font-bold"
               >
                 Download PPSR certificate

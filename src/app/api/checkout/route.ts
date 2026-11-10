@@ -1,3 +1,4 @@
+import { getPpsrProvider } from "@/lib/ppsr";
 import {
   attachSession,
   createReport,
@@ -10,9 +11,14 @@ import { REPORT_PRICE_CENTS, getStripe } from "@/lib/stripe";
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const identifier = normaliseIdentifier(String(body?.identifier ?? ""));
-  if (!isValidIdentifier(identifier)) {
+  const allowPlates = getPpsrProvider().acceptsPlates;
+  if (!isValidIdentifier(identifier, allowPlates)) {
     return Response.json(
-      { error: "Enter a 17-character VIN or an NSW plate." },
+      {
+        error: allowPlates
+          ? "Enter a 17-character VIN or an NSW plate."
+          : "Enter the 17-character VIN. It has no I, O or Q.",
+      },
       { status: 400 },
     );
   }
@@ -24,7 +30,7 @@ export async function POST(request: Request) {
 
   // Demo mode: no Stripe key, so issue the report straight away.
   if (!stripe) {
-    await fulfilReport(report.id);
+    await fulfilReport(report.id, 8000);
     return Response.json({ url: reportUrl });
   }
 

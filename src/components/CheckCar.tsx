@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 
-export default function CheckCar({ demo }: { demo: boolean }) {
+export default function CheckCar({
+  demo,
+  vinOnly,
+}: {
+  demo: boolean;
+  vinOnly: boolean;
+}) {
   const [identifier, setIdentifier] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -32,7 +38,7 @@ export default function CheckCar({ demo }: { demo: boolean }) {
     <form onSubmit={submit} className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
         <label htmlFor="identifier" className="text-[13px] font-semibold text-soft">
-          VIN or NSW plate
+          {vinOnly ? "VIN (17 characters)" : "VIN or NSW plate"}
         </label>
         <input
           id="identifier"

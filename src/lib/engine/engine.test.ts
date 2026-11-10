@@ -83,7 +83,7 @@ describe("bidCeiling", () => {
 });
 
 describe("pathway", () => {
-  const verdictFor = async (id: string) => pathway(await mockProvider.lookup(id));
+  const verdictFor = async (id: string) => pathway((await mockProvider.result(id))!);
 
   it("blocks stolen and written-off vehicles", async () => {
     expect((await verdictFor("TESTS")).verdict).toBe("blocked");

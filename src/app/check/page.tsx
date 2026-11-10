@@ -17,7 +17,7 @@ export default function CheckPage() {
         intro="Find out before you bid or hand over money. One page with the verdict, the reasons and the steps."
       />
       <div className={`${container} grid gap-10 pb-16 lg:grid-cols-2`}>
-        <CheckCard heading="Enter the VIN or plate" />
+        <CheckCard heading="Enter the VIN" />
         <div className="flex flex-col gap-5">
           <h2 className="font-display text-2xl font-bold">What you get</h2>
           <TickList
