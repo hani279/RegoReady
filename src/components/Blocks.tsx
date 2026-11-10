@@ -1,6 +1,6 @@
 import Link from "next/link";
 import CheckCar from "@/components/CheckCar";
-import { getPpsrProvider } from "@/lib/ppsr";
+import { platesEnabled } from "@/lib/plates";
 import { btnPrimary, btnSecondary, card, container, eyebrow } from "@/lib/ui";
 
 export function PageHeader(props: {
@@ -34,7 +34,7 @@ export function CheckCard({ heading = "Can this exact car be registered?" }) {
         Official PPSR certificate, write-off and stolen check, and the
         step-by-step NSW path for this car.
       </p>
-      <CheckCar demo={isDemo()} vinOnly={!getPpsrProvider().acceptsPlates} />
+      <CheckCar demo={isDemo()} plates={platesEnabled()} />
       <Link href="/report/sample" className="flex min-h-11 w-fit items-center text-sm font-semibold underline">
         See a sample report
       </Link>

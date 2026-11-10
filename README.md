@@ -24,6 +24,7 @@ npm test
 | `src/lib/engine/cost.ts` | Landed cost and bid ceiling |
 | `src/lib/engine/pathway.ts` | Verdict (clear, caution, blocked) and the steps to registration from a vehicle record |
 | `src/lib/ppsr/` | PPSR/NEVDIS provider interface, the Business API adapter and the demo provider |
+| `src/lib/plates.ts` | Plate to VIN lookup |
 | `src/lib/reports.ts` | Report storage (Supabase, or a local file) and fulfilment |
 | `src/app/api/checkout` | Creates the report and the Stripe Checkout session |
 | `src/app/api/stripe/webhook` | Fulfils the report when payment completes |
@@ -52,7 +53,16 @@ The report page also confirms the payment itself when the buyer returns from Str
 1. Register at businessapi.com.au and generate a secret key in the dashboard.
 2. Set `PPSR_PROVIDER=businessapi` and `BUSINESSAPI_KEY`. A `bapi_sk_test_...` key uses the free sandbox; a `bapi_sk_live_...` key runs real searches at $6.00 each.
 
-With this provider the check accepts VINs only, because the API has no plate search.
+Business API searches by VIN only, so on its own the check form asks for a VIN. Add the plate search below to accept plates.
+
+**Plate search (carregistrationapi.com.au)**
+
+1. Create an account (it includes 10 free test lookups) and set `PLATE_PROVIDER=regcheck` and `REGCHECK_USERNAME` to the account username.
+2. The buyer enters an NSW plate, sees the matching car and confirms it before paying. The VIN behind the plate is then sent to the register search.
+
+Each lookup costs $0.30 and happens before payment. `src/app/api/plate/route.ts` limits one address to 10 lookups an hour per server instance; on serverless hosting add a shared rate limiter as well.
+
+The lookup in `src/lib/plates.ts` uses the service's HTTP GET form (`/api/reg.asmx/CheckAustralia`), which the provider's documentation does not spell out, and has only been run against a local stand-in. Confirm it with the free test lookups.
 
 The adapter in `src/lib/ppsr/businessapi.ts` is written from the published documentation and has only been run against a local stand-in, not the real API. The documentation does not describe the shape of the `stolen` and `writtenOff` fields or give a registration state, so the adapter reads them defensively: check a few sandbox responses and tighten `toRecord` to match.
 
